@@ -1,4 +1,5 @@
 import "should";
+import { parse } from "csv-parse/sync";
 import { generate } from "../lib/index.js";
 
 describe("Option `columns`", function () {
@@ -147,6 +148,41 @@ describe("Option `columns`", function () {
         ]);
         next();
       });
+    });
+
+    it("quote and escape special characters in text output", function (next) {
+      const columns = [
+        () => "a,b",
+        () => 'say "hi"',
+        () => "line1\nline2",
+        () => "cr\rhere",
+      ];
+      generate({ columns, length: 2, objectMode: true }, (err, records) => {
+        if (err) return next(err);
+        generate({ columns, length: 2, encoding: "ascii" }, (err, data) => {
+          if (err) return next(err);
+          data.should.eql(
+            '"a,b","say ""hi""","line1\nline2","cr\rhere"\n' +
+              '"a,b","say ""hi""","line1\nline2","cr\rhere"',
+          );
+          // The text output describes the same records as `objectMode`
+          parse(data).should.eql(records);
+          next();
+        });
+      });
+    });
+
+    it("quote values containing a custom delimiter", function (next) {
+      const columns = [() => "x;y", () => "z"];
+      generate(
+        { columns, length: 1, delimiter: ";", encoding: "ascii" },
+        (err, data) => {
+          if (err) return next(err);
+          data.should.eql('"x;y";z');
+          parse(data, { delimiter: ";" }).should.eql([["x;y", "z"]]);
+          next();
+        },
+      );
     });
   });
 });

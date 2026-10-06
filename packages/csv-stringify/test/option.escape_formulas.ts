@@ -39,7 +39,9 @@ describe("Option `escape_formulas`", function () {
             "'-c,3",
             "'@d,4",
             "'\te,5",
-            "'\rf,6",
+            // Escaped to `'\rf` and quoted: with the default record
+            // delimiter, "\r" is a record boundary for parsers.
+            '"\'\rf",6',
             "g,7",
             "'\uFF1Dh,8",
             "'\uFF0Bi,9",

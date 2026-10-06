@@ -214,13 +214,18 @@ const stringifier = function (options, state, info) {
           const containsdelimiter = emits_separator(value, delimiter);
           const containsQuote = quote !== "" && value.indexOf(quote) >= 0;
           const containsEscape = value.indexOf(escape) >= 0 && escape !== quote;
-          const containsRecordDelimiter = emits_separator(
-            value,
-            record_delimiter,
-          );
+          // With the default record delimiter, a field containing any line
+          // break must be quoted: parsers such as csv-parse recognize "\r",
+          // "\n" and "\r\n" as record delimiters, so an unquoted "\r" would
+          // corrupt the record boundaries, like an unquoted "\n" would. Only
+          // "\r" needs an explicit check, "\n" is the record delimiter
+          // itself. A custom `record_delimiter` opts out of this behavior.
+          const containsRecordDelimiter =
+            emits_separator(value, record_delimiter) ||
+            (record_delimiter === "\n" && value.indexOf("\r") !== -1);
           const quotedString = quoted_string && typeof field === "string";
           const quotedMatch = matches_quoted_match(value, quoted_match);
-          // See 
+          // See
           // More about CSV injection or formula injection, when websites embed
           // untrusted input inside CSV files:
           // https://owasp.org/www-community/attacks/CSV_Injection

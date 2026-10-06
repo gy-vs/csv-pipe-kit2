@@ -1,5 +1,6 @@
 import "should";
 import dedent from "dedent";
+import { parse } from "csv-parse/sync";
 import { stringify } from "../lib/index.js";
 import { stringify as stringifySync } from "../lib/sync.js";
 
@@ -225,6 +226,35 @@ describe("Option `quote`", function () {
         next();
       },
     );
+  });
+
+  it("fields with `\\r` are quoted with the default record delimiter", function (next) {
+    // Parsers such as csv-parse recognize "\r", "\n" and "\r\n" as record
+    // delimiters, so a field containing "\r" must be quoted like a field
+    // containing "\n" for the output to be parsed back.
+    stringify(
+      [
+        ["cr\rhere", "b"],
+        ["c", "d"],
+      ],
+      (err, data) => {
+        if (err) return next(err);
+        data.should.eql('"cr\rhere",b\nc,d\n');
+        parse(data).should.eql([
+          ["cr\rhere", "b"],
+          ["c", "d"],
+        ]);
+        next();
+      },
+    );
+  });
+
+  it("fields with `\\r` and a custom record delimiter are not quoted", function (next) {
+    stringify([["cr\rhere", "b"]], { record_delimiter: "__" }, (err, data) => {
+      if (err) return next(err);
+      data.should.eql("cr\rhere,b__");
+      next();
+    });
   });
 
   it("regex metacharacter quote is doubled literally (fix #494)", function () {
