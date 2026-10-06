@@ -1,21 +1,26 @@
 import { get } from "../utils/get.js";
 import { is_object } from "../utils/is_object.js";
 import { normalize_columns } from "./normalize_columns.js";
-import { normalize_options } from "./normalize_options.js";
+import {
+  normalize_options,
+  record_delimiter_default,
+} from "./normalize_options.js";
 const bom_utf8 = Buffer.from([239, 187, 191]);
-// True when appending `separator` after `value` would let `parse` find
-// `separator` starting inside `value`. Besides the field containing the whole
-// separator, this also covers boundary fusion: a field whose tail is a
-// non-empty prefix of a multi-character separator merges with the appended
-// separator (eg value "a:" + delimiter "::" => "a:::", matched at offset 1).
-// Such fields must be quoted to round-trip, like RFC 4180 fields containing the
-// delimiter, generalized to multi-character delimiters and record delimiters.
-const emits_separator = function (value, separator) {
-  return (
-    separator.length !== 0 &&
-    (value.indexOf(separator) !== -1 ||
-      (separator.length > 1 &&
-        (value + separator).indexOf(separator) < value.length))
+// True when appending one of `separators` after `value` would let `parse`
+// find that `separator` starting inside `value`. Besides the field containing
+// the whole separator, this also covers boundary fusion: a field whose tail
+// is a non-empty prefix of a multi-character separator merges with the
+// appended separator (eg value "a:" + delimiter "::" => "a:::", matched at
+// offset 1). Such fields must be quoted to round-trip, like RFC 4180 fields
+// containing the delimiter, generalized to multi-character delimiters and
+// record delimiters.
+const emits_separator = function (value, separators) {
+  return separators.some(
+    (separator) =>
+      separator.length !== 0 &&
+      (value.indexOf(separator) !== -1 ||
+        (separator.length > 1 &&
+          (value + separator).indexOf(separator) < value.length)),
   );
 };
 // True when `value` matches one of the `quoted_match` patterns. The regexps
@@ -211,16 +216,22 @@ const stringifier = function (options, state, info) {
               ),
             ];
           }
-          const containsdelimiter = emits_separator(value, delimiter);
+          const containsdelimiter = emits_separator(value, [delimiter]);
           const containsQuote = quote !== "" && value.indexOf(quote) >= 0;
           const containsEscape = value.indexOf(escape) >= 0 && escape !== quote;
+          // With the default `record_delimiter`, readers such as `parse`
+          // auto-detect `\n`, `\r\n` and `\r` as record delimiters: quote
+          // fields containing any line break, not only the configured
+          // delimiter, so the output round-trips (RFC 4180).
           const containsRecordDelimiter = emits_separator(
             value,
-            record_delimiter,
+            options[record_delimiter_default] === true
+              ? [record_delimiter, "\n", "\r"]
+              : [record_delimiter],
           );
           const quotedString = quoted_string && typeof field === "string";
           const quotedMatch = matches_quoted_match(value, quoted_match);
-          // See 
+          // See
           // More about CSV injection or formula injection, when websites embed
           // untrusted input inside CSV files:
           // https://owasp.org/www-community/attacks/CSV_Injection

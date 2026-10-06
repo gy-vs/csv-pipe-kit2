@@ -39,7 +39,9 @@ describe("Option `escape_formulas`", function () {
             "'-c,3",
             "'@d,4",
             "'\te,5",
-            "'\rf,6",
+            // The escaped value contains `\r`, which the default
+            // `record_delimiter` now quotes like any line break
+            '"\'\rf",6',
             "g,7",
             "'\uFF1Dh,8",
             "'\uFF0Bi,9",

@@ -2,11 +2,23 @@ import { CsvError } from "./CsvError.js";
 import { normalize_columns } from "./normalize_columns.js";
 import { underscore } from "../utils/underscore.js";
 
+// Internal marker set on the normalized options when `record_delimiter` is
+// not user-provided. Readers such as `csv-parse` then auto-detect `\n`,
+// `\r\n` and `\r` as record delimiters, so fields containing any of them
+// must be quoted for the output to round-trip. A symbol keeps the marker
+// out of `Object.keys` and `JSON.stringify` while surviving object spreads.
+const record_delimiter_default = Symbol("record_delimiter_default");
+
 const normalize_options = function (opts) {
   const options = {};
   // Merge with user options
   for (const opt in opts) {
     options[underscore(opt)] = opts[opt];
+  }
+  // Preserve the internal marker when re-normalizing options, for example
+  // when merged with the options returned by a cast function
+  if (opts[record_delimiter_default] !== undefined) {
+    options[record_delimiter_default] = opts[record_delimiter_default];
   }
   // Normalize option `bom`
   if (
@@ -247,6 +259,7 @@ const normalize_options = function (opts) {
     options.record_delimiter === null
   ) {
     options.record_delimiter = "\n";
+    options[record_delimiter_default] = true;
   } else if (Buffer.isBuffer(options.record_delimiter)) {
     options.record_delimiter = options.record_delimiter.toString();
   } else if (typeof options.record_delimiter !== "string") {
@@ -276,4 +289,4 @@ const normalize_options = function (opts) {
   return [undefined, options];
 };
 
-export { normalize_options };
+export { normalize_options, record_delimiter_default };

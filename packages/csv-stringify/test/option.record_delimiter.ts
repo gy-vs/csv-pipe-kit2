@@ -1,5 +1,8 @@
 import "should";
+import { parse } from "csv-parse";
+import { parse as parseSync } from "csv-parse/sync";
 import { stringify } from "../lib/index.js";
+import { stringify as stringifySync } from "../lib/sync.js";
 
 describe("Option `record_delimiter`", function () {
   it("validation", function () {
@@ -123,6 +126,61 @@ describe("Option `record_delimiter`", function () {
         result.should.eql(
           "20322051544\u001f8.8017226E7\u001fABC\u001e28392898392\u001f8.8392926E7\u001fDEF\u001e",
         );
+        next();
+      },
+    );
+  });
+
+  it("quote fields containing a carriage return with the default record delimiter", function (next) {
+    // `parse` auto-detects `\n`, `\r\n` and `\r` as record delimiters, so a
+    // field containing any of them must be quoted to round-trip (RFC 4180).
+    stringify(
+      [
+        ["cr\rhere", "b"],
+        ["line1\nline2", "d"],
+        ["crlf\r\nhere", "f"],
+      ],
+      { eof: false },
+      (err, data) => {
+        if (err) return next(err);
+        data.should.eql('"cr\rhere",b\n"line1\nline2",d\n"crlf\r\nhere",f');
+        next();
+      },
+    );
+  });
+
+  it("fields containing line breaks parse back to the original records", function (next) {
+    const records = [
+      ["cr\rhere", "b"],
+      ["c", "d"],
+    ];
+    stringify(records, (err, data) => {
+      if (err) return next(err);
+      parse(data, (err, parsed) => {
+        if (err) return next(err);
+        parsed.should.eql(records);
+        next();
+      });
+    });
+  });
+
+  it("fields containing line breaks parse back to the original records in sync", function () {
+    const records = [
+      ["cr\rhere", "b"],
+      ["c", "d"],
+    ];
+    parseSync(stringifySync(records)).should.eql(records);
+  });
+
+  it("dont quote fields containing a carriage return with a custom record delimiter", function (next) {
+    // An explicit `record_delimiter` preserves the historical behavior:
+    // only fields containing the configured delimiter are quoted.
+    stringify(
+      [["cr\rhere", "b"]],
+      { record_delimiter: "\n", eof: false },
+      (err, data) => {
+        if (err) return next(err);
+        data.should.eql("cr\rhere,b");
         next();
       },
     );
